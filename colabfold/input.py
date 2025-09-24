@@ -348,27 +348,27 @@ def get_queries(
 
                 queries.append((header, sequences, None))
             else:  # file.suffix.lower() in [".a3m", ".fasta", ".faa"]
-                (seqs, header) = parse_fasta(file.read_text())
-            if len(seqs) == 0:
-                logger.error(f"{file} is empty")
-                continue
-            query_sequence = seqs[0]
-            if len(seqs) > 1 and file.suffix in [".fasta", ".faa", ".fa"]:
-                logger.warning(
-                    f"More than one sequence in {file}, ignoring all but the first sequence"
-                )
+                (seqs, headers) = parse_fasta(file.read_text())
+                if len(seqs) == 0:
+                    logger.error(f"{file} is empty")
+                    continue
 
-            if file.suffix.lower() == ".a3m":
-                a3m_lines = [file.read_text()]
-                queries.append((file.stem, query_sequence.upper(), a3m_lines, None))
-            else:
-                if query_sequence.count(":") == 0:
-                    # Single sequence
-                    queries.append((file.stem, query_sequence, None, None))
+                if file.suffix.lower() == ".a3m":
+                    query_sequence = seqs[0]
+                    a3m_lines = [file.read_text()]
+                    queries.append((file.stem, query_sequence.upper(), a3m_lines, None))
                 else:
-                    # Complex mode
-                    protein_queries, other_queries = classify_molecules(query_sequence)
-                    queries.append((file.stem, protein_queries, None, other_queries))
+                    # Handle multiple sequences in FASTA files properly
+                    for sequence, header in zip(seqs, headers):
+                        sequence = sequence.upper()
+                        query_header = header if header else file.stem
+                        if sequence.count(":") == 0:
+                            # Single sequence
+                            queries.append((query_header, sequence, None, None))
+                        else:
+                            # Complex mode (multi-chain)
+                            protein_queries, other_queries = classify_molecules(sequence)
+                            queries.append((query_header, protein_queries, None, other_queries))
 
     # sort by seq. len
     if sort_queries_by == "length":
